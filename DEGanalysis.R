@@ -42,28 +42,6 @@ library(tidyverse)
 library(readxl)
 
 ################################################
-###  
-### Selection gains larger than 50% of the chr8
-### Selection gains that involve the q arm using centromere position as reference
-###
-###############################################
-pred<- read.delim("~/Google Drive/My Drive/Bachisio/Documents/Project/MM/Prediction_Model/AMoritz/prediction_may_2020.txt", sep="\t", stringsAsFactors = F)
-cnv<- read.delim("~/Google Drive/My Drive/Share/2022_final/CNV/CoMMpass_CN_data_collapsed.txt")
-head(cnv)
-#           sample Chrom    start      end major minor
-# 1 MMRF_1016_1_BM     1   571000   720500     1     0
-# 2 MMRF_1016_1_BM     1   730700  9450900     2     1
-# 3 MMRF_1016_1_BM     1  9456900  9820400     1     0
-# 4 MMRF_1016_1_BM     1  9826900 16199000     2     1
-# 5 MMRF_1016_1_BM     1 16204900 16299400     1     0
-# 6 MMRF_1016_1_BM     1 16304400 74541800     2     1
-gain8<- cnv[cnv$Chrom==8 & (cnv$end-cnv$start)>73182011 & cnv$major>2,] ### select gains larger than 50% of the chr8
-gain8<- gain8[gain8$end > 45600001, ] ### select gains that invovle the q arm using centromere position as ref
-pred<- pred[pred$study =="MMRF",]
-pred$gain8<- 0
-pred$gain8[pred$sample %in% gsub("_1_BM","", gain8$sample)]<- 1
-pred_mmrf<- pred[pred$study=="MMRF",]### select only MMRF
-pred_mmrf<- pred_mmrf[pred_mmrf$sample %in% gsub("_1_BM","",cnv$sample), ]
 
 
 ####################
@@ -90,7 +68,7 @@ exp[1:5,1:5]
 
 
 # . . . - Pheno data
-pdata<-pred_mmrf
+pdata<-read.delim("~/Google Drive/My Drive/Bachisio/Documents/Project/MM/Prediction_Model/AMoritz/prediction_may_2020.txt",stringsAsFactors = F)
 rownames(pdata)<- pdata$sample
 pdata[1:2,]
 #              sample age gender   ecog    ISS SCT_first_line time_SCT SCT_line pfs_code pfs_time os_code os_time KAR chemo BORT LEN THAL DARA ELO duration
@@ -249,63 +227,3 @@ dim(q1)
 q2<-topTable(efit_8,coef=1,number=nrow(v),adjust="BH")
 dim(q2)
 q1<-q2
-
-
-# . . . - Pathway Analysis - GSEA
-setlist<-read.table("~/Desktop/Tools/Reference/gsea/h.all.v6.2.symbols.gmt_MOD_CART_paper.txt",sep="\t",fill=T,header=F,as.is=T)
-gs<-vector("list",length=nrow(setlist))
-names(gs)<-setlist[,1]
-setlist<-setlist[,-c(1:2)]
-for(i in 1:nrow(setlist)){
-  temp<-as.vector(as.matrix(setlist[i,]))
-  temp<-temp[temp!=""]
-  gs[[i]]<-temp
-}
-
-res_8<-topTable(efit_8,coef=1,number=nrow(v),adjust="BH")
-rnk_8<-res_8$t
-names(rnk_8)<-res_8$hgnc_symbol.x
-fgseaRes_8 <- fgseaMultilevel(pathways = gs, 
-                              stats = rnk_8,
-                              minSize=15,
-                              maxSize=500)
-fgseaRes_8<-fgseaRes_8[order(fgseaRes_8$pval),]
-fwrite(fgseaRes_8,file="~/Google Drive/My Drive/Bachisio/Documents/Project/Team/MauraF/DARA-KRD_GeneExpression/trisomie/chr8/gsea_analysis_genesets_MODchr8_022023.txt",sep="\t",sep2=c("", ";", ""))
-
-
-
-res_8<-read.table("~/Google Drive/My Drive/Bachisio/Documents/Project/Team/MauraF/DARA-KRD_GeneExpression/trisomie/chr8/gsea_analysis_genesets_MODchr8_022023.txt",sep="\t",fill=T,header=T,as.is=T)
-res_8<-res_8[order(res_8$pathway),]
-
-nes__8<-matrix(0,nrow=52,ncol=2)
-fdr__8<-matrix(0,nrow=52,ncol=2)
-nes__8[,1]<-res_8$NES
-fdr__8[,1]<-res_8$padj
-nes__8[,2]<-0
-fdr__8[,2]<-1
-
-rownames(nes__8)<-res_8$pathway
-rownames(fdr__8)<-res_8$pathway
-colnames(nes__8)<-c("Trisomie chr8","offset")
-colnames(fdr__8)<-c("Trisomie chr8","offset")
-
-heatmap.2(nes__8,
-          trace="none",
-          dendrogram="none",
-          col=brewer.pal(11,"RdYlBu")[11:1],
-          density.info="none",
-          key.xlab = "NES",
-          mar=c(2,15),
-          labRow=gsub("HALLMARK_","",rownames(nes__8)),
-          colsep=0:ncol(nes__8),
-          rowsep=0:nrow(nes__8),
-          sepcolor="grey30",
-          sepwidth=c(0.001,0.001),
-          cellnote=ifelse(fdr__8<0.05,"X",""),
-          notecex=0.6,
-          notecol="black",
-          cexCol = 1)
-legend("topright",
-       legend="X: FDR >= 0.05",
-       bty="n",
-       inset=c(0.3,0))
